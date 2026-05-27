@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local-Test 项圈观察台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero panel">
+      <div>
+        <p class="eyebrow">LOCAL TEST / PUBLIC MQTT</p>
+        <h1>宠物项圈实时观察台</h1>
+        <p class="hero-text">页面直接连接公共 MQTT WebSocket，不走证书和桥接服务。用于观察本地测试版设备的电量、GNSS、IMU 姿态和 AMR-NB 音频事件。</p>
+      </div>
+      <div class="hero-status">
+        <span id="mqttStatus" class="status-pill muted">MQTT 未连接</span>
+        <span id="lastReport" class="status-pill muted">等待数据</span>
+        <span id="decodeStatus" class="status-pill muted">音频解码待检测</span>
+      </div>
+    </section>
+
+    <section class="connect-panel panel">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">DIRECT MQTT</p>
+          <h2>公共 Broker 连接</h2>
+        </div>
+        <span class="panel-meta">WebSocket：broker.emqx.io:8084/mqtt</span>
+      </div>
+      <div class="connect-grid">
+        <label><span>WebSocket URL</span><input id="brokerUrl" value="wss://broker.emqx.io:8084/mqtt" /></label>
+        <label><span>Topic</span><input id="topicInput" value="DEVICE_REPORT/+" /></label>
+        <label><span>Client ID</span><input id="clientIdInput" /></label>
+        <div class="button-row">
+          <button id="connectBtn" class="primary">连接</button>
+          <button id="disconnectBtn" class="ghost">断开</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="top-grid">
+      <article class="panel battery-card">
+        <p class="panel-kicker">BATTERY</p>
+        <div class="battery-visual" id="batteryVisual">
+          <div class="battery-cap"></div>
+          <div class="battery-body">
+            <div id="batteryFill" class="battery-fill"></div>
+            <span id="batteryPercent">--%</span>
+          </div>
+        </div>
+        <div class="metric-line"><span>电压</span><strong id="batteryVoltage">-- mV</strong></div>
+        <div class="metric-line"><span>状态</span><strong id="batteryChargeState">--</strong></div>
+        <div class="metric-line"><span>来源</span><strong id="batterySource">--</strong></div>
+        <div class="metric-line"><span>上报间隔</span><strong id="batteryInterval">--</strong></div>
+      </article>
+
+      <article class="panel device-card">
+        <p class="panel-kicker">DEVICE</p>
+        <h2 id="deviceIdValue">--</h2>
+        <div class="metric-line"><span>报文类型</span><strong id="reportTypeValue">--</strong></div>
+        <div class="metric-line"><span>位置间隔</span><strong id="locationInterval">--</strong></div>
+        <div class="metric-line"><span>Power Mode</span><strong id="powerMode">--</strong></div>
+      </article>
+
+      <article class="panel imu-card">
+        <p class="panel-kicker">IMU COLLAR</p>
+        <div class="collar-scene">
+          <div id="collarModel" class="collar-model">
+            <div class="collar-band"></div>
+            <div class="collar-core"></div>
+            <div class="collar-buckle"></div>
+          </div>
+        </div>
+        <div class="metric-line"><span>运动状态</span><strong id="motionState">unknown</strong></div>
+        <div class="metric-line"><span>姿态</span><strong id="imuTilt">--</strong></div>
+      </article>
+    </section>
+
+    <section class="main-grid">
+      <article class="panel map-panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">GNSS</p>
+            <h2>地图与轨迹</h2>
+          </div>
+          <span id="latLngText" class="panel-meta">--, --</span>
+        </div>
+        <div id="map"></div>
+        <div class="map-stats">
+          <span>状态：<strong id="gnssFix">--</strong></span>
+          <span>卫星：<strong id="satelliteCount">--</strong></span>
+          <span>HDOP：<strong id="hdopValue">--</strong></span>
+        </div>
+      </article>
+
+      <article class="panel audio-panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">AUDIO</p>
+            <h2>AMR-NB 语音</h2>
+          </div>
+          <span id="audioDecodeState" class="panel-meta">收到后自动尝试解码</span>
+        </div>
+        <div class="audio-summary">
+          <div><span>Clip</span><strong id="audioClip">--</strong></div>
+          <div><span>段数</span><strong id="audioSegments">--</strong></div>
+          <div><span>编码</span><strong id="audioCodec">--</strong></div>
+          <div><span>大小</span><strong id="audioBytes">--</strong></div>
+        </div>
+        <div id="audioList" class="audio-list"></div>
+      </article>
+    </section>
+
+    <section class="bottom-grid">
+      <article class="panel small-panel">
+        <p class="panel-kicker">IMU DATA</p>
+        <pre id="imuVector">X -- / Y -- / Z --</pre>
+      </article>
+      <article class="panel small-panel">
+        <p class="panel-kicker">EVENT LOG</p>
+        <div id="eventLog" class="event-log"></div>
+      </article>
+      <article class="panel raw-panel">
+        <p class="panel-kicker">RAW PAYLOAD</p>
+        <pre id="rawPayload">{}</pre>
+      </article>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
