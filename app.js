@@ -20,8 +20,11 @@
     locationInterval: document.getElementById("locationInterval"),
     powerMode: document.getElementById("powerMode"),
     gnssFix: document.getElementById("gnssFix"),
+    locationSource: document.getElementById("locationSource"),
+    locationStale: document.getElementById("locationStale"),
     satelliteCount: document.getElementById("satelliteCount"),
     hdopValue: document.getElementById("hdopValue"),
+    accuracyValue: document.getElementById("accuracyValue"),
     latLngText: document.getElementById("latLngText"),
     motionState: document.getElementById("motionState"),
     imuTilt: document.getElementById("imuTilt"),
@@ -188,13 +191,20 @@
 
   function renderGnss(gnss) {
     ui.gnssFix.textContent = gnss.status || (gnss.valid ? "fixed" : "not_fixed");
+    if (ui.locationSource) ui.locationSource.textContent = gnss.source || "--";
+    if (ui.locationStale) ui.locationStale.textContent = gnss.stale ? "last known" : "实时";
     ui.satelliteCount.textContent = valueOrDash(gnss.satellites_num);
     ui.hdopValue.textContent = valueOrDash(gnss.hdop);
+    if (ui.accuracyValue) ui.accuracyValue.textContent = valueOrDash(gnss.accuracy_m, " m");
 
     const lat = Number(gnss.latitude);
     const lon = Number(gnss.longitude);
     if (gnss.valid && Number.isFinite(lat) && Number.isFinite(lon)) {
       ui.latLngText.textContent = lat.toFixed(6) + ", " + lon.toFixed(6);
+      state.marker.setStyle({
+        color: gnss.source === "cellloc" ? "#ffb65f" : "#56d7cd",
+        fillColor: gnss.stale ? "#ff6c7b" : (gnss.source === "cellloc" ? "#ffe39b" : "#bffff8"),
+      });
       state.marker.setLatLng([lat, lon]);
       state.points.push([lat, lon]);
       if (state.points.length > 160) state.points.shift();
